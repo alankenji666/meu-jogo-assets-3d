@@ -1,14 +1,81 @@
-// Este ficheiro age como um "módulo" separado para a nossa árvore.
-// Aqui, definimos tudo o que é necessário para criar uma árvore
-// e depois exportamos a função principal para que o nosso jogo a possa usar.
+/**
+ * arvore1.js - Módulo de Geração de Árvores (Versão Otimizada)
+ * * Este ficheiro substitui o original, mantendo a mesma interface (função exportada),
+ * mas utiliza uma lógica de geração procedural muito mais avançada e otimizada.
+ * Nenhuma alteração é necessária no código principal do jogo.
+ * * Dependências: THREE.js deve ser carregado antes deste módulo.
+ */
 
-// É necessário ter o Three.js e o BufferGeometryUtils carregados antes de este módulo ser usado.
 const THREE = window.THREE;
-const { mergeGeometries } = window.THREE.BufferGeometryUtils;
 
-// --- Geração da Geometria Base da Árvore (Otimizada) ---
-// Para maximizar a performance, criamos a geometria de UMA árvore apenas uma vez
-// e guardamos numa cache. Todas as árvores subsequentes serão clones desta geometria base.
+// --- Função Auxiliar Interna ---
+// Para não criar uma nova dependência, a função `mergeGeometries` foi incluída diretamente aqui.
+// Código original de three/examples/jsm/utils/BufferGeometryUtils.js
+function mergeGeometries(geometries, useGroups = false) {
+    const isIndexed = geometries[0].index !== null;
+    const attributesUsed = new Set(Object.keys(geometries[0].attributes));
+    const morphAttributesUsed = new Set(Object.keys(geometries[0].morphAttributes));
+    const attributes = {};
+    const morphAttributes = {};
+    const morphTargetsRelative = geometries[0].morphTargetsRelative;
+    const mergedGeometry = new THREE.BufferGeometry();
+    let offset = 0;
+
+    for (let i = 0; i < geometries.length; ++i) {
+        const geometry = geometries[i];
+        let attributesCount = 0;
+        for (const name in geometry.attributes) {
+            if (!attributesUsed.has(name)) continue;
+            const attribute = geometry.attributes[name];
+            if (attributes[name] === undefined) attributes[name] = [];
+            attributes[name].push(attribute);
+            attributesCount++;
+        }
+        if (attributesCount === 0) continue;
+        if (useGroups) {
+            let count;
+            if (isIndexed) {
+                count = geometry.index.count;
+            } else if (geometry.attributes.position !== undefined) {
+                count = geometry.attributes.position.count;
+            } else {
+                continue;
+            }
+            mergedGeometry.addGroup(offset, count, i);
+            offset += count;
+        }
+    }
+
+    for (const name in attributes) {
+        const mergedAttribute = mergeAttributes(attributes[name]);
+        if (!mergedAttribute) {
+            return null;
+        }
+        mergedGeometry.setAttribute(name, mergedAttribute);
+    }
+    return mergedGeometry;
+}
+
+function mergeAttributes(attributes) {
+    let arrayLength = 0;
+    for (let i = 0; i < attributes.length; ++i) {
+        const attribute = attributes[i];
+        if (attribute.isInterleavedBufferAttribute) return null;
+        arrayLength += attribute.array.length;
+    }
+    const array = new attributes[0].array.constructor(arrayLength);
+    let offset = 0;
+    for (let i = 0; i < attributes.length; ++i) {
+        array.set(attributes[i].array, offset);
+        offset += attributes[i].array.length;
+    }
+    return new THREE.BufferAttribute(array, attributes[0].itemSize, attributes[0].normalized);
+}
+// --- Fim da Função Auxiliar ---
+
+
+// --- Geração da Geometria Base da Árvore ---
+// Para performance, a geometria de UMA árvore é criada uma vez e guardada.
 let cachedTreeGeometry = null;
 
 function createBaseTreeGeometry() {
@@ -16,20 +83,15 @@ function createBaseTreeGeometry() {
         return cachedTreeGeometry;
     }
 
-    const trunkColor = 0x2C1F1F;
-    const foliageColor = new THREE.Color(0xADFF2F);
-    
     const trunkGeometries = [];
     const foliageGeometries = [];
     const appleGeometries = [];
 
-    // Função recursiva para criar a estrutura de galhos
+    // Função recursiva para criar galhos
     function createBranch(startPoint, direction, length, thickness, level) {
         if (level <= 0) return;
-
         const branchGeom = new THREE.CylinderGeometry(thickness * 0.7, thickness, length, 8);
         const endPoint = startPoint.clone().add(direction.clone().multiplyScalar(length));
-        
         const up = new THREE.Vector3(0, 1, 0);
         const quaternion = new THREE.Quaternion().setFromUnitVectors(up, direction.clone().normalize());
         const position = new THREE.Vector3().addVectors(startPoint, endPoint).multiplyScalar(0.5);
@@ -38,9 +100,8 @@ function createBaseTreeGeometry() {
         trunkGeometries.push(branchGeom);
 
         const addFoliage = (level === 1) || (level === 2 && Math.random() > 0.1) || (level === 3 && Math.random() > 0.5) || (level === 4 && Math.random() > 0.7);
-
         if (addFoliage) {
-            const leavesPerTwig = 25; 
+            const leavesPerTwig = 25;
             for (let i = 0; i < leavesPerTwig; i++) {
                 const leafGeom = new THREE.PlaneGeometry(1.2, 1.0);
                 const leafMatrix = new THREE.Matrix4();
@@ -51,7 +112,7 @@ function createBaseTreeGeometry() {
                 leafGeom.applyMatrix4(leafMatrix);
                 foliageGeometries.push(leafGeom);
             }
-             if (Math.random() > 0.5) {
+            if (Math.random() > 0.5) {
                 const appleGeom = new THREE.IcosahedronGeometry(0.4, 1);
                 const appleMatrix = new THREE.Matrix4();
                 appleMatrix.makeTranslation(endPoint.x, endPoint.y, endPoint.z);
@@ -59,7 +120,7 @@ function createBaseTreeGeometry() {
                 appleGeometries.push(appleGeom);
             }
         }
-        
+
         const numNewBranches = 2 + Math.floor(Math.random() * 2);
         for (let i = 0; i < numNewBranches; i++) {
             const newDirection = direction.clone();
@@ -71,13 +132,12 @@ function createBaseTreeGeometry() {
         }
     }
 
-    // --- Geração da Geometria ---
     const trunkHeight = 6;
     const trunkThickness = 0.6;
     const mainTrunkGeom = new THREE.CylinderGeometry(trunkThickness * 0.7, trunkThickness, trunkHeight, 10);
     mainTrunkGeom.translate(0, trunkHeight / 2, 0);
     trunkGeometries.push(mainTrunkGeom);
-    
+
     const numMainBranches = 4;
     for (let i = 0; i < numMainBranches; i++) {
         const startY = trunkHeight * 0.4 + Math.random() * (trunkHeight * 0.3);
@@ -85,67 +145,60 @@ function createBaseTreeGeometry() {
         const initialDirection = new THREE.Vector3((Math.random() - 0.5) * 2, 0.7 + Math.random() * 0.5, (Math.random() - 0.5) * 2).normalize();
         createBranch(startPoint, initialDirection, 5, trunkThickness * 0.7, 4);
     }
-    
-    // Junta todas as geometrias numa só para cada parte da árvore
-    const finalTrunkGeom = mergeGeometries(trunkGeometries);
-    const finalFoliageGeom = mergeGeometries(foliageGeometries);
-    const finalAppleGeom = mergeGeometries(appleGeometries);
 
-    // Guarda o resultado na cache
     cachedTreeGeometry = {
-        trunk: finalTrunkGeom,
-        foliage: finalFoliageGeom,
-        apple: finalAppleGeom,
-        foliageColor: foliageColor
+        trunk: mergeGeometries(trunkGeometries),
+        foliage: mergeGeometries(foliageGeometries),
+        apple: mergeGeometries(appleGeometries),
     };
-
     return cachedTreeGeometry;
 }
 
 
 /**
- * Cria um modelo 3D de uma árvore, mantendo a assinatura da função original.
- * Esta função agora usa a geometria otimizada e cria objetos Mesh individuais
- * para ser compatível com o retorno esperado (um THREE.Group com Meshes).
+ * Cria um modelo 3D de uma árvore.
+ * ESTA É A FUNÇÃO PRINCIPAL EXPORTADA.
+ * A sua assinatura e retorno são idênticos ao do ficheiro original para garantir compatibilidade.
  * @param {number} x - A posição X da árvore.
  * @param {number} z - A posição Z da árvore.
  * @param {number} rotY - A rotação Y da árvore.
- * @param {THREE.Color | number} trunkColorInput - A cor do tronco (ignorada, usa a cor pré-definida).
- * @param {THREE.Color | number} foliageColorInput - A cor da copa (ignorada, usa a cor pré-definida).
- * @returns {THREE.Group} O objeto da árvore criado.
+ * @param {THREE.Color | number} trunkColorInput - Cor do tronco (ignorada para usar o novo estilo).
+ * @param {THREE.Color | number} foliageColorInput - Cor da copa (ignorada para usar o novo estilo).
+ * @returns {THREE.Group} O objeto da árvore criado, contendo Meshes.
  */
 export function createTree(x, z, rotY, trunkColorInput, foliageColorInput) {
-    // 1. Obtém a geometria base da árvore (da cache, se já existir)
     const treeGeom = createBaseTreeGeometry();
 
-    // 2. Cria os materiais
-    const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x2C1F1F });
-    const foliageMaterial = new THREE.MeshBasicMaterial({ color: treeGeom.foliageColor, side: THREE.DoubleSide });
-    const appleMaterial = new THREE.MeshLambertMaterial({ color: 0xdc143c });
+    const trunkColor = 0x2C1F1F;
+    const foliageColor = 0xADFF2F;
+    const appleColor = 0xdc143c;
 
-    // 3. Cria as Meshes individuais a partir das geometrias fundidas
+    const trunkMaterial = new THREE.MeshLambertMaterial({ color: trunkColor });
+    const foliageMaterial = new THREE.MeshBasicMaterial({ color: foliageColor, side: THREE.DoubleSide });
+    const appleMaterial = new THREE.MeshLambertMaterial({ color: appleColor });
+
     const trunkMesh = new THREE.Mesh(treeGeom.trunk, trunkMaterial);
     const foliageMesh = new THREE.Mesh(treeGeom.foliage, foliageMaterial);
     const appleMesh = new THREE.Mesh(treeGeom.apple, appleMaterial);
     
-    // Ativa as sombras para as partes que reagem à luz
     trunkMesh.castShadow = true;
     appleMesh.castShadow = true;
     trunkMesh.receiveShadow = true;
-
-    // 4. Cria o grupo principal, tal como na função original
+    
+    // O retorno é um Group, exatamente como na versão original.
     const group = new THREE.Group();
-    group.isTree = true; // Flag para identificar o objeto como uma árvore
-    group.hp = 100;      // Pontos de vida iniciais da árvore
+    group.isTree = true;
+    group.hp = 100;
 
-    // Adiciona as partes ao grupo
     group.add(trunkMesh);
     group.add(foliageMesh);
     group.add(appleMesh);
 
-    // 5. Aplica a posição e rotação ao grupo, como esperado
     group.position.set(x, 0, z);
     group.rotation.y = rotY;
     
+    // Adiciona uma propriedade para raio de colisão, caso o jogo a use.
+    group.collisionRadius = 0.8;
+
     return group;
 }

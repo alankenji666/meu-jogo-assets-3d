@@ -18,11 +18,11 @@ export async function createInstancedGrass(THREE, scene, grassTiles, gltfLoader,
     }
 
     try {
-        const gltf = await gltfLoader.loadAsync(repoBaseUrl + 'grama3.glb');
+        const gltf = await gltfLoader.loadAsync(repoBaseUrl + '111_grama3.glb');
         const grassSourceMesh = gltf.scene.children[0];
 
         if (!grassSourceMesh || !grassSourceMesh.isMesh) {
-            console.error("Não foi possível encontrar uma malha no arquivo grama2.glb");
+            console.error("Não foi possível encontrar uma malha no arquivo 111_grama3.glb");
             return;
         }
 

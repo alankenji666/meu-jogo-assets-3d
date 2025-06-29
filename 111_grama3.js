@@ -18,7 +18,7 @@ export async function createInstancedGrass(THREE, scene, grassTiles, gltfLoader,
     }
 
     try {
-        const gltf = await gltfLoader.loadAsync(repoBaseUrl + 'grama2.glb');
+        const gltf = await gltfLoader.loadAsync(repoBaseUrl + 'grama3.glb');
         const grassSourceMesh = gltf.scene.children[0];
 
         if (!grassSourceMesh || !grassSourceMesh.isMesh) {

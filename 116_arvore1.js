@@ -1,4 +1,4 @@
-const THREE = window.THREE;
+
 
 /**
  * Cria árvores usando InstancedMesh para otimizar o desempenho.
@@ -9,7 +9,7 @@ const THREE = window.THREE;
  * @param {number} groundLevel - Altura do solo.
  * @returns {{ trunks: THREE.InstancedMesh, foliage: THREE.InstancedMesh }}
  */
-export function createInstancedTrees(scene, treeTiles, trunkColor = 0x8B4513, foliageColor = 0x228B22, groundLevel = 0.1) {
+export function createInstancedTrees(THREE, scene, treeTiles, trunkColor = 0x8B4513, foliageColor = 0x228B22, groundLevel = 0.1) {
     if (!treeTiles || treeTiles.length === 0) {
         console.log("Nenhuma árvore para instanciar.");
         return;

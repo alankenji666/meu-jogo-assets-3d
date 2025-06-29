@@ -1,57 +1,59 @@
-// Este ficheiro age como um "módulo" separado para a nossa árvore.
-// Aqui, definimos tudo o que é necessário para criar uma árvore
-// e depois exportamos a função principal para que o nosso jogo a possa usar.
-
-// É necessário ter o Three.js carregado antes de este módulo ser usado.
 const THREE = window.THREE;
 
 /**
- * Cria um modelo 3D de uma árvore com um tronco e uma copa mais detalhada.
- * @param {number} x - A posição X da árvore.
- * @param {number} z - A posição Z da árvore.
- * @param {number} rotY - A rotação Y da árvore.
- * @param {THREE.Color | number} trunkColor - A cor do tronco.
- * @param {THREE.Color | number} foliageColor - A cor da copa.
- * @returns {THREE.Group} O objeto da árvore criado.
+ * Cria árvores usando InstancedMesh para otimizar o desempenho.
+ * @param {THREE.Scene} scene - A cena onde as árvores serão adicionadas.
+ * @param {Array<Object>} treeTiles - Um array com as posições das árvores.
+ * @param {number} trunkColor - Cor do tronco.
+ * @param {number} foliageColor - Cor da copa.
+ * @param {number} groundLevel - Altura do solo.
+ * @returns {{ trunks: THREE.InstancedMesh, foliage: THREE.InstancedMesh }}
  */
-export function createTree(x, z, rotY, trunkColor, foliageColor) {
-    // Cria um grupo para conter todas as partes da árvore.
-    // Desta forma, podemos mover, rodar ou apagar a árvore toda de uma vez.
-    const group = new THREE.Group();
-    group.isTree = true; // Flag para identificar o objeto como uma árvore
-    group.hp = 100;      // Pontos de vida iniciais da árvore
+export function createInstancedTrees(scene, treeTiles, trunkColor = 0x8B4513, foliageColor = 0x228B22, groundLevel = 0.1) {
+    if (!treeTiles || treeTiles.length === 0) {
+        console.log("Nenhuma árvore para instanciar.");
+        return;
+    }
 
-    // Materiais com cores definidas. Usamos MeshLambertMaterial para que reaja à luz.
-    const trunkMat = new THREE.MeshLambertMaterial({ color: trunkColor });
-    const foliageMat = new THREE.MeshLambertMaterial({ color: foliageColor });
+    const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.3, 3, 8);
+    const foliageGeometry = new THREE.SphereGeometry(1.5, 8, 6);
 
-    // --- Criação do Tronco ---
-    const trunk = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.2, 0.3, 3, 8), 
-        trunkMat
-    );
-    trunk.position.y = 1.5; // Levanta o tronco para que a base fique no chão
+    const trunkMaterial = new THREE.MeshLambertMaterial({ color: trunkColor });
+    const foliageMaterial = new THREE.MeshLambertMaterial({ color: foliageColor });
 
-    // --- Criação da Copa (Foliage) ---
-    // Usamos várias esferas para dar um aspeto mais "cheio" e natural.
-    const foliage1 = new THREE.Mesh(new THREE.SphereGeometry(1.5, 8, 6), foliageMat);
-    foliage1.position.y = 3 + 1.2;
+    const trunkMesh = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, treeTiles.length);
+    const foliageMesh = new THREE.InstancedMesh(foliageGeometry, foliageMaterial, treeTiles.length);
 
-    const foliage2 = new THREE.Mesh(new THREE.SphereGeometry(1.2, 8, 6), foliageMat);
-    foliage2.position.set(0.8, 2.5, 0.5);
+    const dummy = new THREE.Object3D();
 
-    const foliage3 = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), foliageMat);
-    foliage3.position.set(-0.5, 2.8, -0.8);
-    
-    // Adiciona todas as partes ao grupo principal da árvore
-    group.add(trunk, foliage1, foliage2, foliage3);
+    treeTiles.forEach((tile, i) => {
+        const x = tile.x;
+        const z = tile.z;
+        const rotY = Math.random() * Math.PI * 2;
 
-    // --- Posicionamento e Rotação Final ---
-    group.position.set(x, 0.1, z); // Posição no mundo do jogo
-    group.rotation.y = rotY;          // Rotação inicial
+        // Tronco
+        dummy.position.set(x, groundLevel + 1.5, z);
+        dummy.rotation.set(0, rotY, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        trunkMesh.setMatrixAt(i, dummy.matrix);
 
-    // Define um raio de colisão para o tronco, para que o jogador não o atravesse.
-    trunk.collisionRadius = 0.3;
-    
-    return group;
+        // Copa
+        dummy.position.set(x, groundLevel + 3.5, z);
+        dummy.rotation.set(0, rotY, 0);
+        const scale = Math.random() * 0.3 + 0.9;
+        dummy.scale.set(scale, scale, scale);
+        dummy.updateMatrix();
+        foliageMesh.setMatrixAt(i, dummy.matrix);
+    });
+
+    trunkMesh.instanceMatrix.needsUpdate = true;
+    foliageMesh.instanceMatrix.needsUpdate = true;
+
+    scene.add(trunkMesh);
+    scene.add(foliageMesh);
+
+    console.log(`[+] ${treeTiles.length} árvores instanciadas com sucesso.`);
+
+    return { trunks: trunkMesh, foliage: foliageMesh };
 }
